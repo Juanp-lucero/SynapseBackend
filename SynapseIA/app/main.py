@@ -20,10 +20,18 @@ app = FastAPI(
 )
 
 
+# =========================
+# Routers
+# =========================
+
 app.include_router(users_router)
 app.include_router(auth_router)
 app.include_router(projects_router)
 
+
+# =========================
+# Endpoints generales
+# =========================
 
 @app.get("/")
 def root():

@@ -1,51 +1,55 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pwdlib import PasswordHash
 
 from app.database.connection import get_db
 from app.models.user import User
-from app.schemas.user import UserLogin, Token
-from app.core.security import (
-    verify_password,
-    create_access_token
-)
+from app.schemas.user import UserCreate, UserResponse
 
 
 router = APIRouter(
-    prefix="/auth",
-    tags=["Authentication"]
+    prefix="/users",
+    tags=["Users"]
 )
 
 
-@router.post("/login", response_model=Token)
-def login(
-    user_data: UserLogin,
+password_hash = PasswordHash.recommended()
+
+
+@router.post(
+    "/",
+    response_model=UserResponse
+)
+def create_user(
+    user_data: UserCreate,
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(
+
+    existing_user = db.query(User).filter(
         User.email == user_data.email
     ).first()
 
-    if not user:
+    if existing_user:
+
         raise HTTPException(
-            status_code=401,
-            detail="Correo o contraseña incorrectos"
+            status_code=400,
+            detail="El correo electrónico ya está registrado"
         )
 
-    if not verify_password(
-        user_data.password,
-        user.password
-    ):
-        raise HTTPException(
-            status_code=401,
-            detail="Correo o contraseña incorrectos"
-        )
+    hashed_password = password_hash.hash(
+        user_data.password
+    )
 
-    access_token = create_access_token({
-        "sub": str(user.id),
-        "email": user.email
-    })
+    new_user = User(
+        name=user_data.name,
+        email=user_data.email,
+        password=hashed_password
+    )
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer"
-    }
+    db.add(new_user)
+
+    db.commit()
+
+    db.refresh(new_user)
+
+    return new_user
