@@ -6,7 +6,7 @@ from pwdlib import PasswordHash
 from dotenv import load_dotenv
 
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
@@ -14,6 +14,11 @@ from app.models.user import User
 
 
 load_dotenv()
+
+
+# =========================
+# Configuración de seguridad
+# =========================
 
 password_hash = PasswordHash.recommended()
 
@@ -27,30 +32,54 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
 
-oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="/auth/login"
-)
+# =========================
+# Autenticación Bearer
+# =========================
 
+security = HTTPBearer()
+
+
+# =========================
+# Verificar contraseña
+# =========================
 
 def verify_password(
     plain_password: str,
     hashed_password: str
 ) -> bool:
+
     return password_hash.verify(
         plain_password,
         hashed_password
     )
 
 
-def get_password_hash(password: str) -> str:
-    return password_hash.hash(password)
+# =========================
+# Generar hash de contraseña
+# =========================
+
+def get_password_hash(
+    password: str
+) -> str:
+
+    return password_hash.hash(
+        password
+    )
 
 
-def create_access_token(data: dict) -> str:
+# =========================
+# Crear JWT
+# =========================
+
+def create_access_token(
+    data: dict
+) -> str:
 
     to_encode = data.copy()
 
-    expire = datetime.now(timezone.utc) + timedelta(
+    expire = datetime.now(
+        timezone.utc
+    ) + timedelta(
         minutes=ACCESS_TOKEN_EXPIRE_MINUTES
     )
 
@@ -67,8 +96,12 @@ def create_access_token(data: dict) -> str:
     return encoded_jwt
 
 
+# =========================
+# Obtener usuario actual
+# =========================
+
 def get_current_user(
-    token: str = Depends(oauth2_scheme),
+    credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db)
 ):
 
@@ -79,6 +112,11 @@ def get_current_user(
             "WWW-Authenticate": "Bearer"
         }
     )
+
+    # Obtener el token enviado en:
+    # Authorization: Bearer TOKEN
+
+    token = credentials.credentials
 
     try:
 
@@ -98,6 +136,8 @@ def get_current_user(
     except (jwt.PyJWTError, ValueError):
 
         raise credentials_exception
+
+    # Buscar el usuario en PostgreSQL
 
     user = db.query(User).filter(
         User.id == user_id
