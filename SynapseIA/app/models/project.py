@@ -7,11 +7,21 @@ from app.database.connection import Base
 class Project(Base):
     __tablename__ = "projects"
 
-    id = Column(Integer, primary_key=True, index=True)
+    id = Column(
+        Integer,
+        primary_key=True,
+        index=True
+    )
 
-    name = Column(String(150), nullable=False)
+    name = Column(
+        String(150),
+        nullable=False
+    )
 
-    description = Column(Text, nullable=True)
+    description = Column(
+        Text,
+        nullable=True
+    )
 
     user_id = Column(
         Integer,
