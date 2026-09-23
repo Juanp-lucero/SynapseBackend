@@ -5,6 +5,7 @@ from app.database.connection import Base
 
 
 class Source(Base):
+
     __tablename__ = "sources"
 
     id = Column(
@@ -33,11 +34,24 @@ class Source(Base):
         nullable=True
     )
 
+    # ==========================================
+    # TEXTO EXTRAÍDO DEL DOCUMENTO
+    # ==========================================
+
+    extracted_text = Column(
+        Text,
+        nullable=True
+    )
+
     project_id = Column(
         Integer,
         ForeignKey("projects.id"),
         nullable=False
     )
+
+    # ==========================================
+    # RELACIÓN CON PROYECTO
+    # ==========================================
 
     project = relationship(
         "Project",
