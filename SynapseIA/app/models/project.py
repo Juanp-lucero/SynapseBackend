@@ -29,7 +29,15 @@ class Project(Base):
         nullable=False
     )
 
+    # Relación con el usuario
     user = relationship(
         "User",
         back_populates="projects"
+    )
+
+    # Relación con las fuentes
+    sources = relationship(
+        "Source",
+        back_populates="project",
+        cascade="all, delete-orphan"
     )
