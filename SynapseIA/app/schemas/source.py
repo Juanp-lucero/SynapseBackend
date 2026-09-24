@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-
+from app.services.document_processor import process_document
 
 class SourceCreate(BaseModel):
 
@@ -16,6 +16,7 @@ class SourceResponse(BaseModel):
     type: str
     description: str | None
     file_path: str | None
+    extracted_text: str | None
     project_id: int
 
     class Config:

@@ -18,6 +18,7 @@ from app.models.project import Project
 from app.models.user import User
 from app.schemas.source import SourceCreate, SourceResponse
 from app.core.security import get_current_user
+from app.services.document_processor import process_document
 
 
 router = APIRouter(
@@ -99,7 +100,9 @@ async def upload_source(
     db: Session = Depends(get_db)
 ):
 
+    # =========================
     # Verificar proyecto
+    # =========================
 
     project = db.query(Project).filter(
         Project.id == project_id,
@@ -113,7 +116,10 @@ async def upload_source(
             detail="Proyecto no encontrado"
         )
 
+
+    # =========================
     # Obtener extensión
+    # =========================
 
     original_name = file.filename or ""
 
@@ -121,7 +127,10 @@ async def upload_source(
         original_name
     )[1].lower()
 
+
+    # =========================
     # Validar extensión
+    # =========================
 
     if extension not in ALLOWED_EXTENSIONS:
 
@@ -130,14 +139,20 @@ async def upload_source(
             detail="Tipo de archivo no permitido. Use PDF, TXT, DOCX o CSV."
         )
 
-    # Crear carpeta si no existe
+
+    # =========================
+    # Crear carpeta
+    # =========================
 
     os.makedirs(
         UPLOAD_DIR,
         exist_ok=True
     )
 
+
+    # =========================
     # Crear nombre único
+    # =========================
 
     unique_name = (
         f"{uuid.uuid4()}{extension}"
@@ -148,7 +163,10 @@ async def upload_source(
         unique_name
     )
 
+
+    # =========================
     # Guardar archivo
+    # =========================
 
     with open(
         file_path,
@@ -159,7 +177,29 @@ async def upload_source(
 
         buffer.write(content)
 
-    # Crear registro en PostgreSQL
+
+    # =========================
+    # Extraer texto
+    # =========================
+
+    try:
+
+        extracted_text = process_document(
+            file_path
+        )
+
+    except Exception as e:
+
+        extracted_text = ""
+
+        print(
+            f"Error procesando documento: {e}"
+        )
+
+
+    # =========================
+    # Crear registro
+    # =========================
 
     source = Source(
         name=original_name,
@@ -169,12 +209,21 @@ async def upload_source(
         ).upper(),
         description=f"Archivo cargado: {original_name}",
         file_path=file_path,
+        extracted_text=extracted_text,
         project_id=project.id
     )
 
+
+    # =========================
+    # Guardar en PostgreSQL
+    # =========================
+
     db.add(source)
+
     db.commit()
+
     db.refresh(source)
+
 
     return source
 
@@ -270,7 +319,10 @@ def delete_source(
             detail="Fuente no encontrada"
         )
 
+
+    # =========================
     # Eliminar archivo físico
+    # =========================
 
     if source.file_path:
 
@@ -282,10 +334,15 @@ def delete_source(
                 source.file_path
             )
 
+
+    # =========================
     # Eliminar registro
+    # =========================
 
     db.delete(source)
+
     db.commit()
+
 
     return {
         "message": "Fuente eliminada correctamente"

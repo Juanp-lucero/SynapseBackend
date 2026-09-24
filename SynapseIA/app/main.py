@@ -1,29 +1,18 @@
 from fastapi import FastAPI
 
 from app.database.connection import Base, engine
-
-# =========================
-# Modelos
-# =========================
-
 from app.models.user import User
 from app.models.project import Project
 from app.models.source import Source
-
-
-# =========================
-# Routers
-# =========================
-
+from app.models.analysis_result import AnalysisResult
 from app.api.users import router as users_router
 from app.api.auth import router as auth_router
 from app.api.projects import router as projects_router
 from app.api.sources import router as sources_router
+from app.api.analysis import router as analysis_router
 
 
-# =========================
-# Crear tablas
-# =========================
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -47,7 +36,7 @@ app.include_router(users_router)
 app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(sources_router)
-
+app.include_router(analysis_router)
 
 # =========================
 # Endpoints generales

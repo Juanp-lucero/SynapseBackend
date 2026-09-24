@@ -34,10 +34,6 @@ class Source(Base):
         nullable=True
     )
 
-    # ==========================================
-    # TEXTO EXTRAÍDO DEL DOCUMENTO
-    # ==========================================
-
     extracted_text = Column(
         Text,
         nullable=True
@@ -49,11 +45,13 @@ class Source(Base):
         nullable=False
     )
 
-    # ==========================================
-    # RELACIÓN CON PROYECTO
-    # ==========================================
-
     project = relationship(
         "Project",
         back_populates="sources"
     )
+
+    analysis_results = relationship(
+    "AnalysisResult",
+    back_populates="source",
+    cascade="all, delete-orphan"
+)
