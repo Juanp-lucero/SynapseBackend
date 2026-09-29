@@ -4,10 +4,6 @@ from pypdf import PdfReader
 from docx import Document
 
 
-# ==========================================
-# EXTRAER TEXTO DE PDF
-# ==========================================
-
 def extract_pdf_text(file_path: str) -> str:
 
     reader = PdfReader(file_path)
@@ -24,10 +20,6 @@ def extract_pdf_text(file_path: str) -> str:
     return "\n".join(text)
 
 
-# ==========================================
-# EXTRAER TEXTO DE DOCX
-# ==========================================
-
 def extract_docx_text(file_path: str) -> str:
 
     document = Document(file_path)
@@ -42,10 +34,6 @@ def extract_docx_text(file_path: str) -> str:
     return "\n".join(text)
 
 
-# ==========================================
-# EXTRAER TEXTO DE TXT
-# ==========================================
-
 def extract_txt_text(file_path: str) -> str:
 
     with open(
@@ -58,25 +46,57 @@ def extract_txt_text(file_path: str) -> str:
         return file.read()
 
 
-# ==========================================
-# EXTRAER CONTENIDO DE CSV
-# ==========================================
-
 def extract_csv_text(file_path: str) -> str:
-
-    # Pandas solamente se carga cuando realmente
-    # estamos procesando un archivo CSV.
 
     import pandas as pd
 
     dataframe = pd.read_csv(file_path)
 
-    return dataframe.to_string(index=False)
+    lines = []
 
+    columns = dataframe.columns.tolist()
 
-# ==========================================
-# PROCESADOR PRINCIPAL
-# ==========================================
+    lines.append(
+        "TIPO DE FUENTE: DATASET CSV"
+    )
+
+    lines.append(
+        f"NUMERO DE FILAS: {len(dataframe)}"
+    )
+
+    lines.append(
+        f"NUMERO DE COLUMNAS: {len(columns)}"
+    )
+
+    lines.append(
+        "COLUMNAS: " + ", ".join(
+            str(column)
+            for column in columns
+        )
+    )
+
+    lines.append(
+        "TIPOS DE DATOS:"
+    )
+
+    for column in columns:
+
+        lines.append(
+            f"{column}: {dataframe[column].dtype}"
+        )
+
+    lines.append(
+        "DATOS DEL DATASET:"
+    )
+
+    lines.append(
+        dataframe.to_string(
+            index=False
+        )
+    )
+
+    return "\n".join(lines)
+
 
 def process_document(file_path: str) -> str:
 
@@ -86,19 +106,27 @@ def process_document(file_path: str) -> str:
 
     if extension == ".pdf":
 
-        return extract_pdf_text(file_path)
+        return extract_pdf_text(
+            file_path
+        )
 
     elif extension == ".docx":
 
-        return extract_docx_text(file_path)
+        return extract_docx_text(
+            file_path
+        )
 
     elif extension == ".txt":
 
-        return extract_txt_text(file_path)
+        return extract_txt_text(
+            file_path
+        )
 
     elif extension == ".csv":
 
-        return extract_csv_text(file_path)
+        return extract_csv_text(
+            file_path
+        )
 
     else:
 

@@ -1,7 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
 from app.core.security import get_current_user
+from app.database.connection import get_db
 from app.database.neo4j_connection import driver, NEO4J_DATABASE
 from app.models.user import User
+from app.models.project import Project
+from app.models.source import Source
 
 
 router = APIRouter(
@@ -10,11 +15,14 @@ router = APIRouter(
 )
 
 
-@router.get("/source/{source_id}")
-def get_source_graph(
-    source_id: int,
-    current_user: User = Depends(get_current_user)
-):
+def build_graph(source_ids: list[int]):
+
+    if not source_ids:
+        return {
+            "source_ids": [],
+            "nodes": [],
+            "relationships": []
+        }
 
     try:
 
@@ -22,66 +30,72 @@ def get_source_graph(
             database=NEO4J_DATABASE
         ) as session:
 
-            result = session.run(
+            node_result = session.run(
                 """
-                MATCH (d:Document {
-                    source_id: $source_id
-                })
+                MATCH (d:Document)
+                WHERE d.source_id IN $source_ids
 
-                OPTIONAL MATCH (n)-[r]->(m)
+                OPTIONAL MATCH (d)-[*1..2]-(n)
 
-                WHERE
-                    (n = d OR m = d)
-                    OR
-                    (n:Entity AND m:Entity)
+                WITH
+                    collect(DISTINCT d) +
+                    collect(DISTINCT n) AS raw_nodes
+
+                UNWIND raw_nodes AS node
+
+                WITH DISTINCT node
+
+                WHERE node IS NOT NULL
 
                 RETURN
-                    labels(n) AS source_labels,
-                    properties(n) AS source,
-                    type(r) AS relation,
-                    labels(m) AS target_labels,
-                    properties(m) AS target
+                    labels(node) AS labels,
+                    properties(node) AS properties
                 """,
-                source_id=source_id
+                source_ids=source_ids
             )
 
-            nodes = {}
+            nodes = []
+
+            for record in node_result:
+
+                nodes.append({
+                    "labels": record["labels"],
+                    "properties": record["properties"]
+                })
+
+
+            relationship_result = session.run(
+                """
+                MATCH p = (d:Document)-[*1..2]-(n)
+
+                WHERE d.source_id IN $source_ids
+
+                UNWIND relationships(p) AS relationship
+
+                WITH DISTINCT relationship
+
+                RETURN
+                    properties(startNode(relationship)) AS source,
+                    type(relationship) AS relation,
+                    properties(endNode(relationship)) AS target
+                """,
+                source_ids=source_ids
+            )
+
             relationships = []
 
-            for record in result:
+            for record in relationship_result:
 
-                source = record["source"]
-                target = record["target"]
+                relationships.append({
+                    "source": record["source"],
+                    "relation": record["relation"],
+                    "target": record["target"]
+                })
 
-                source_key = str(source)
-
-                if source_key not in nodes:
-
-                    nodes[source_key] = {
-                        "labels": record["source_labels"],
-                        "properties": source
-                    }
-
-                if target:
-
-                    target_key = str(target)
-
-                    if target_key not in nodes:
-
-                        nodes[target_key] = {
-                            "labels": record["target_labels"],
-                            "properties": target
-                        }
-
-                    relationships.append({
-                        "source": source,
-                        "relation": record["relation"],
-                        "target": target
-                    })
 
             return {
-                "source_id": source_id,
-                "nodes": list(nodes.values()),
+                "source_ids": source_ids,
+                "nodes": nodes,
                 "relationships": relationships
             }
 
@@ -91,3 +105,104 @@ def get_source_graph(
             status_code=500,
             detail=f"Error consultando el grafo: {str(e)}"
         )
+
+
+@router.get("/")
+def get_general_graph(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    sources = (
+        db.query(Source)
+        .join(
+            Project,
+            Source.project_id == Project.id
+        )
+        .filter(
+            Project.user_id == current_user.id
+        )
+        .all()
+    )
+
+    source_ids = [
+        source.id
+        for source in sources
+    ]
+
+    return build_graph(
+        source_ids
+    )
+
+
+@router.get("/project/{project_id}")
+def get_project_graph(
+    project_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    project = (
+        db.query(Project)
+        .filter(
+            Project.id == project_id,
+            Project.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not project:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Proyecto no encontrado"
+        )
+
+    sources = (
+        db.query(Source)
+        .filter(
+            Source.project_id == project_id
+        )
+        .all()
+    )
+
+    source_ids = [
+        source.id
+        for source in sources
+    ]
+
+    return build_graph(
+        source_ids
+    )
+
+
+@router.get("/source/{source_id}")
+def get_source_graph(
+    source_id: int,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+
+    source = (
+        db.query(Source)
+        .join(
+            Project,
+            Source.project_id == Project.id
+        )
+        .filter(
+            Source.id == source_id,
+            Project.user_id == current_user.id
+        )
+        .first()
+    )
+
+    if not source:
+
+        raise HTTPException(
+            status_code=404,
+            detail="Fuente no encontrada"
+        )
+
+    return build_graph(
+        [source_id]
+    )

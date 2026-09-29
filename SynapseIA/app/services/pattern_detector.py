@@ -1,128 +1,214 @@
 import re
 
 
-# ==========================================
-# DETECTAR PATRÓN DE CATEGORÍAS
-# ==========================================
+CATEGORY_KEYWORDS = [
+    "electronics",
+    "clothing",
+    "beauty",
+    "technology",
+    "health",
+    "finance",
+    "education",
+    "sales",
+    "marketing",
+    "products",
+    "customers",
+    "employees",
+    "tecnologia",
+    "tecnología",
+    "salud",
+    "finanzas",
+    "educacion",
+    "educación",
+    "ventas",
+    "mercadeo",
+    "productos",
+    "clientes",
+    "empleados"
+]
 
-def detect_category_pattern(
+
+METRIC_KEYWORDS = [
+    "total ventas",
+    "crecimiento interanual",
+    "ticket promedio",
+    "ventas",
+    "crecimiento",
+    "ingresos",
+    "precio",
+    "rentabilidad",
+    "ganancia",
+    "costos",
+    "coste",
+    "margen"
+]
+
+
+def find_years(
     text: str
-) -> list[dict]:
-
-    patterns = []
-
-    text_lower = text.lower()
-
-    categories = [
-        "electronics",
-        "clothing",
-        "beauty"
-    ]
-
-    found_categories = []
-
-    for category in categories:
-
-        if category in text_lower:
-
-            found_categories.append(
-                category
-            )
-
-    if len(found_categories) >= 2:
-
-        patterns.append({
-            "type": "CATEGORY_GROUP",
-            "description": (
-                "El documento contiene "
-                "múltiples categorías de productos."
-            ),
-            "entities": found_categories
-        })
-
-    return patterns
-
-
-# ==========================================
-# DETECTAR PATRÓN TEMPORAL
-# ==========================================
-
-def detect_temporal_pattern(
-    text: str
-) -> list[dict]:
-
-    patterns = []
+) -> list[str]:
 
     years = re.findall(
         r"\b(?:19|20)\d{2}\b",
         text
     )
 
-    years = sorted(
+    return sorted(
         list(set(years))
     )
 
-    if len(years) >= 2:
 
-        patterns.append({
-            "type": "TEMPORAL_COMPARISON",
-            "description": (
-                "El documento contiene información "
-                "correspondiente a múltiples años."
-            ),
-            "entities": years
-        })
+def find_categories(
+    text: str
+) -> list[str]:
 
-    return patterns
+    text_lower = text.lower()
+
+    found_categories = []
+
+    for category in CATEGORY_KEYWORDS:
+
+        pattern = rf"\b{re.escape(category)}\b"
+
+        if re.search(
+            pattern,
+            text_lower
+        ):
+            found_categories.append(
+                category
+            )
+
+    return list(
+        dict.fromkeys(found_categories)
+    )
 
 
-# ==========================================
-# DETECTAR MÉTRICAS
-# ==========================================
+def find_metrics(
+    text: str
+) -> list[str]:
+
+    text_lower = text.lower()
+
+    found_metrics = []
+
+    for metric in METRIC_KEYWORDS:
+
+        pattern = rf"\b{re.escape(metric)}\b"
+
+        if re.search(
+            pattern,
+            text_lower
+        ):
+            found_metrics.append(
+                metric
+            )
+
+    return list(
+        dict.fromkeys(found_metrics)
+    )
+
+
+def find_numbers(
+    text: str
+) -> list[str]:
+
+    numbers = re.findall(
+        r"\b\d+(?:[.,]\d+)?\b",
+        text
+    )
+
+    return list(
+        dict.fromkeys(numbers)
+    )
+
+
+def detect_category_pattern(
+    text: str
+) -> list[dict]:
+
+    categories = find_categories(
+        text
+    )
+
+    if len(categories) < 2:
+        return []
+
+    return [{
+        "type": "CATEGORY_GROUP",
+        "description": (
+            "El documento contiene "
+            "múltiples categorías de información."
+        ),
+        "entities": categories
+    }]
+
+
+def detect_temporal_pattern(
+    text: str
+) -> list[dict]:
+
+    years = find_years(
+        text
+    )
+
+    if len(years) < 2:
+        return []
+
+    return [{
+        "type": "TEMPORAL_COMPARISON",
+        "description": (
+            "El documento contiene información "
+            "correspondiente a múltiples años."
+        ),
+        "entities": years
+    }]
+
 
 def detect_metric_pattern(
     text: str
 ) -> list[dict]:
 
-    patterns = []
+    metrics = find_metrics(
+        text
+    )
 
-    text_lower = text.lower()
+    if len(metrics) < 2:
+        return []
 
-    metrics = []
-
-    possible_metrics = [
-        "total ventas",
-        "crecimiento interanual",
-        "ticket promedio",
-        "ventas",
-        "crecimiento"
-    ]
-
-    for metric in possible_metrics:
-
-        if metric in text_lower:
-
-            metrics.append(
-                metric
-            )
-
-    if len(metrics) >= 2:
-
-        patterns.append({
-            "type": "MULTIPLE_METRICS",
-            "description": (
-                "El documento contiene "
-                "múltiples indicadores de negocio."
-            ),
-            "entities": metrics
-        })
-
-    return patterns
+    return [{
+        "type": "MULTIPLE_METRICS",
+        "description": (
+            "El documento contiene "
+            "múltiples indicadores de información."
+        ),
+        "entities": metrics
+    }]
 
 
-# ==========================================
-# DETECTAR TODOS LOS PATRONES
-# ==========================================
+def detect_metric_value_pattern(
+    text: str
+) -> list[dict]:
+
+    metrics = find_metrics(
+        text
+    )
+
+    numbers = find_numbers(
+        text
+    )
+
+    if not metrics or not numbers:
+        return []
+
+    return [{
+        "type": "METRIC_WITH_VALUES",
+        "description": (
+            "El documento contiene indicadores "
+            "acompañados de valores numéricos."
+        ),
+        "entities": metrics + numbers
+    }]
+
 
 def detect_patterns(
     text: str
@@ -144,6 +230,12 @@ def detect_patterns(
 
     patterns.extend(
         detect_metric_pattern(
+            text
+        )
+    )
+
+    patterns.extend(
+        detect_metric_value_pattern(
             text
         )
     )
