@@ -1,26 +1,28 @@
 import os
+import secrets
+
 from datetime import datetime, timedelta, timezone
 
 import jwt
+
 from pwdlib import PasswordHash
 from dotenv import load_dotenv
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.models.user import User
+from app.models.refresh_token import RefreshToken
 
 
 load_dotenv()
 
 
-# =========================
-# Configuración de seguridad
-# =========================
-
 password_hash = PasswordHash.recommended()
+
 
 SECRET_KEY = os.getenv(
     "SECRET_KEY",
@@ -29,19 +31,13 @@ SECRET_KEY = os.getenv(
 
 ALGORITHM = "HS256"
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 60
+ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
+REFRESH_TOKEN_EXPIRE_DAYS = 30
 
-# =========================
-# Autenticación Bearer
-# =========================
 
 security = HTTPBearer()
 
-
-# =========================
-# Verificar contraseña
-# =========================
 
 def verify_password(
     plain_password: str,
@@ -54,10 +50,6 @@ def verify_password(
     )
 
 
-# =========================
-# Generar hash de contraseña
-# =========================
-
 def get_password_hash(
     password: str
 ) -> str:
@@ -66,10 +58,6 @@ def get_password_hash(
         password
     )
 
-
-# =========================
-# Crear JWT
-# =========================
 
 def create_access_token(
     data: dict
@@ -96,9 +84,32 @@ def create_access_token(
     return encoded_jwt
 
 
-# =========================
-# Obtener usuario actual
-# =========================
+def create_refresh_token(
+    db: Session,
+    user_id: int
+) -> str:
+
+    token = secrets.token_urlsafe(64)
+
+    expires_at = (
+        datetime.now(timezone.utc)
+        + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    )
+
+    refresh_token = RefreshToken(
+        token=token,
+        user_id=user_id,
+        expires_at=expires_at
+    )
+
+    db.add(refresh_token)
+
+    db.commit()
+
+    db.refresh(refresh_token)
+
+    return token
+
 
 def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
@@ -112,9 +123,6 @@ def get_current_user(
             "WWW-Authenticate": "Bearer"
         }
     )
-
-    # Obtener el token enviado en:
-    # Authorization: Bearer TOKEN
 
     token = credentials.credentials
 
@@ -133,11 +141,12 @@ def get_current_user(
 
         user_id = int(user_id)
 
-    except (jwt.PyJWTError, ValueError):
+    except (
+        jwt.PyJWTError,
+        ValueError
+    ):
 
         raise credentials_exception
-
-    # Buscar el usuario en PostgreSQL
 
     user = db.query(User).filter(
         User.id == user_id
@@ -147,3 +156,36 @@ def get_current_user(
         raise credentials_exception
 
     return user
+
+
+def validate_refresh_token(
+    db: Session,
+    token: str
+):
+
+    refresh_token = db.query(
+        RefreshToken
+    ).filter(
+        RefreshToken.token == token
+    ).first()
+
+    if refresh_token is None:
+        return None
+
+    now = datetime.now(timezone.utc)
+
+    expires_at = refresh_token.expires_at
+
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(
+            tzinfo=timezone.utc
+        )
+
+    if expires_at <= now:
+
+        db.delete(refresh_token)
+        db.commit()
+
+        return None
+
+    return refresh_token
