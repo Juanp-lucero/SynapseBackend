@@ -7,6 +7,7 @@ from app.models.user import User
 from app.models.project import Project
 from app.models.source import Source
 from app.models.analysis_result import AnalysisResult
+from app.models.refresh_token import RefreshToken
 
 from app.api.users import router as users_router
 from app.api.auth import router as auth_router

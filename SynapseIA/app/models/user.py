@@ -5,6 +5,7 @@ from app.database.connection import Base
 
 
 class User(Base):
+
     __tablename__ = "users"
 
     id = Column(
@@ -32,6 +33,12 @@ class User(Base):
 
     projects = relationship(
         "Project",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
+    refresh_tokens = relationship(
+        "RefreshToken",
         back_populates="user",
         cascade="all, delete-orphan"
     )
