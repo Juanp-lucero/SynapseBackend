@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.security import get_current_user
 from app.database.connection import get_db
 from app.models.analysis_result import AnalysisResult
@@ -14,6 +15,7 @@ from app.services.groq_service import (
     GroqNotConfiguredError,
     GroqServiceError,
     generate_analysis_summary,
+    answer_analysis_question,
 )
 
 router = APIRouter(prefix="/ai", tags=["AI"])
@@ -42,8 +44,6 @@ def ai_status(
     _current_user: User = Depends(get_current_user),
 ) -> dict[str, str | bool]:
     """Report AI configuration state without exposing credentials."""
-    from app.core.config import settings
-
     return {
         "provider": "groq",
         "configured": bool(settings.groq_api_key),
@@ -98,8 +98,6 @@ def summarize_source(
     except GroqServiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from None
 
-    from app.core.config import settings
-
     return AnalysisSummaryResponse(
         source_id=source.id,
         provider="groq",
@@ -143,8 +141,6 @@ def ask_about_source(
             detail="La fuente todavía no tiene un análisis guardado",
         )
 
-    from app.services.groq_service import answer_analysis_question
-
     try:
         answer = answer_analysis_question(
             question=payload.question,
@@ -158,8 +154,6 @@ def ask_about_source(
         raise HTTPException(status_code=503, detail=str(exc)) from None
     except GroqServiceError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from None
-
-    from app.core.config import settings
 
     return AnalysisQuestionResponse(
         source_id=source.id,
