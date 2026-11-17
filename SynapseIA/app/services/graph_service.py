@@ -1,4 +1,7 @@
-from app.database.neo4j_connection import driver, NEO4J_DATABASE
+from app.database.neo4j_connection import (
+    get_neo4j_driver,
+    NEO4J_DATABASE
+)
 
 
 def save_analysis_to_graph(
@@ -9,16 +12,12 @@ def save_analysis_to_graph(
     patterns: list[dict],
     hypotheses: list[dict]
 ):
+    neo4j_driver = get_neo4j_driver()
 
-    with driver.session(
-        database=NEO4J_DATABASE
-    ) as session:
-
+    with neo4j_driver.session(database=NEO4J_DATABASE) as session:
         session.run(
             """
-            MERGE (d:Document {
-                source_id: $source_id
-            })
+            MERGE (d:Document {source_id: $source_id})
             SET d.name = $source_name
             """,
             source_id=source_id,
@@ -26,20 +25,11 @@ def save_analysis_to_graph(
         )
 
         for entity in entities:
-
             session.run(
                 """
-                MERGE (e:Entity {
-                    name: $name,
-                    type: $type
-                })
-
+                MERGE (e:Entity {name: $name, type: $type})
                 WITH e
-
-                MATCH (d:Document {
-                    source_id: $source_id
-                })
-
+                MATCH (d:Document {source_id: $source_id})
                 MERGE (e)-[:MENTIONED_IN]->(d)
                 """,
                 name=entity["value"],
@@ -48,20 +38,11 @@ def save_analysis_to_graph(
             )
 
         for relation in relations:
-
             session.run(
                 """
-                MERGE (source:Entity {
-                    name: $source_name
-                })
-
-                MERGE (target:Entity {
-                    name: $target_name
-                })
-
-                MERGE (source)-[r:RELATED_TO]->(target)
-
-                SET r.relation_type = $relation_type
+                MATCH (source:Entity {name: $source_name})
+                MATCH (target:Entity {name: $target_name})
+                MERGE (source)-[r:RELATED_TO {relation_type: $relation_type}]->(target)
                 """,
                 source_name=relation["source"],
                 target_name=relation["target"],
@@ -69,30 +50,14 @@ def save_analysis_to_graph(
             )
 
         for pattern in patterns:
-
-            pattern_type = pattern.get(
-                "type",
-                "UNKNOWN"
-            )
-
-            description = pattern.get(
-                "description",
-                ""
-            )
+            pattern_type = pattern.get("type", "UNKNOWN")
+            description = pattern.get("description", "")
 
             session.run(
                 """
-                MERGE (p:Pattern {
-                    type: $type,
-                    description: $description
-                })
-
+                MERGE (p:Pattern {type: $type, description: $description})
                 WITH p
-
-                MATCH (d:Document {
-                    source_id: $source_id
-                })
-
+                MATCH (d:Document {source_id: $source_id})
                 MERGE (p)-[:DETECTED_IN]->(d)
                 """,
                 type=pattern_type,
@@ -101,38 +66,17 @@ def save_analysis_to_graph(
             )
 
         for hypothesis in hypotheses:
-
-            title = hypothesis.get(
-                "title",
-                "Sin título"
-            )
-
-            description = hypothesis.get(
-                "description",
-                ""
-            )
-
-            confidence = hypothesis.get(
-                "confidence",
-                0
-            )
+            title = hypothesis.get("title", "Sin título")
+            description = hypothesis.get("description", "")
+            confidence = hypothesis.get("confidence", 0)
 
             session.run(
                 """
-                MERGE (h:Hypothesis {
-                    title: $title,
-                    source_id: $source_id
-                })
-
+                MERGE (h:Hypothesis {title: $title, source_id: $source_id})
                 SET h.description = $description,
                     h.confidence = $confidence
-
                 WITH h
-
-                MATCH (d:Document {
-                    source_id: $source_id
-                })
-
+                MATCH (d:Document {source_id: $source_id})
                 MERGE (h)-[:GENERATED_FROM]->(d)
                 """,
                 title=title,
