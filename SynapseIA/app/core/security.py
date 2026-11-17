@@ -93,6 +93,11 @@ def get_current_user(
         user_id = int(user_id)
     except (jwt.PyJWTError, ValueError, RuntimeError):
         raise credentials_exception from None
+    except RuntimeError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="La autenticación no está configurada correctamente",
+        ) from None
 
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
