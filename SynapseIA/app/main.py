@@ -14,6 +14,7 @@ from app.api.auth import router as auth_router
 from app.api.projects import router as projects_router
 from app.api.sources import router as sources_router
 from app.api.analysis import router as analysis_router
+from app.api.ai import router as ai_router
 from app.api.graph import router as graph_router
 from app.api.dashboard import router as dashboard_router
 
@@ -44,6 +45,7 @@ app.include_router(auth_router)
 app.include_router(projects_router)
 app.include_router(sources_router)
 app.include_router(analysis_router)
+app.include_router(ai_router)
 app.include_router(graph_router)
 app.include_router(dashboard_router)
 
