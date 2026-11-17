@@ -1,9 +1,9 @@
-from pydantic import BaseModel
 from datetime import datetime
+
+from pydantic import BaseModel, ConfigDict
 
 
 class AnalysisResponse(BaseModel):
-
     id: int
     source_id: int
     status: str
@@ -13,5 +13,9 @@ class AnalysisResponse(BaseModel):
     hypotheses: list
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AnalysisWithSummaryResponse(AnalysisResponse):
+    ai_summary: str | None = None
+    ai_provider: str | None = None
