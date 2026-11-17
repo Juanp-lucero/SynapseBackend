@@ -1,41 +1,26 @@
-import os
-
-from dotenv import load_dotenv
 from neo4j import GraphDatabase
 
-
-load_dotenv()
-
-
-NEO4J_URI = os.getenv(
-    "NEO4J_URI"
-)
-
-NEO4J_USERNAME = os.getenv(
-    "NEO4J_USERNAME"
-)
-
-NEO4J_PASSWORD = os.getenv(
-    "NEO4J_PASSWORD"
-)
-
-NEO4J_DATABASE = os.getenv(
-    "NEO4J_DATABASE",
-    "neo4j"
-)
+from app.core.config import settings
 
 
-driver = GraphDatabase.driver(
-    NEO4J_URI,
-    auth=(
-        NEO4J_USERNAME,
-        NEO4J_PASSWORD
+driver = None
+
+if (
+    settings.neo4j_uri
+    and settings.neo4j_username
+    and settings.neo4j_password
+):
+    driver = GraphDatabase.driver(
+        settings.neo4j_uri,
+        auth=(settings.neo4j_username, settings.neo4j_password),
     )
-)
 
 
 def verify_neo4j_connection():
+    if driver is None:
+        raise RuntimeError(
+            "Neo4j no está configurado. Revisa las variables NEO4J_*."
+        )
 
     driver.verify_connectivity()
-
     return True
