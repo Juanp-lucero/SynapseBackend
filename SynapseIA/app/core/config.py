@@ -24,6 +24,13 @@ class Settings:
         self.groq_model = os.getenv(
             "GROQ_MODEL", "llama-3.3-70b-versatile"
         ).strip()
+        self.cors_origins = [
+            origin.strip().rstrip("/")
+            for origin in os.getenv(
+                "CORS_ORIGINS", "http://localhost:4200"
+            ).split(",")
+            if origin.strip()
+        ]
 
 
 settings = Settings()
