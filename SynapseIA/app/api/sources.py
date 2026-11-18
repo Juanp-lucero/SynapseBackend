@@ -31,7 +31,11 @@ router = APIRouter(
 # Configuración de archivos
 # =========================
 
-UPLOAD_DIR = "uploads"
+# En Vercel solo /tmp tiene permisos de escritura.
+UPLOAD_DIR = os.getenv(
+    "UPLOAD_DIR",
+    "/tmp/uploads" if os.getenv("VERCEL") else "uploads"
+)
 
 ALLOWED_EXTENSIONS = {
     ".pdf",
