@@ -4,8 +4,16 @@ from types import SimpleNamespace
 
 import pytest
 
+import httpx
+from groq import NotFoundError
+
 from app.core.config import settings
 from app.services import groq_service
+
+
+@pytest.fixture(autouse=True)
+def reset_working_model(monkeypatch) -> None:
+    monkeypatch.setattr(groq_service, "_working_model", None)
 
 
 def test_summary_requires_api_key(monkeypatch) -> None:
@@ -107,3 +115,62 @@ def test_provider_error_does_not_leak_provider_details(monkeypatch) -> None:
 def test_prompt_treats_document_content_as_untrusted() -> None:
     assert "datos no confiables" in groq_service.SYSTEM_PROMPT
     assert "No inventes" in groq_service.SYSTEM_PROMPT
+
+
+def model_not_found() -> NotFoundError:
+    request = httpx.Request("POST", "https://api.groq.com/openai/v1/chat/completions")
+    return NotFoundError(
+        "model_not_found", response=httpx.Response(404, request=request), body=None
+    )
+
+
+def test_retired_model_falls_back_to_the_next_one(monkeypatch) -> None:
+    calls = []
+    monkeypatch.setattr(settings, "groq_api_key", "fake-key")
+    monkeypatch.setattr(settings, "groq_model", "llama-3.3-70b-versatile")
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            calls.append(kwargs)
+            if kwargs["model"] == "llama-3.3-70b-versatile":
+                raise model_not_found()
+            return SimpleNamespace(
+                choices=[SimpleNamespace(message=SimpleNamespace(content="Respuesta"))]
+            )
+
+    class FakeGroq:
+        def __init__(self, api_key):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setattr(groq_service, "Groq", FakeGroq)
+
+    result = groq_service.generate_analysis_summary(
+        source_name="a.txt", entities=[], relations=[], patterns=[], hypotheses=[]
+    )
+
+    assert result == "Respuesta"
+    assert [call["model"] for call in calls] == [
+        "llama-3.3-70b-versatile",
+        "openai/gpt-oss-120b",
+    ]
+    # Reasoning models get extra budget and low effort so they still answer.
+    assert calls[1]["extra_body"] == {"reasoning_effort": "low"}
+    assert calls[1]["max_tokens"] > calls[0]["max_tokens"]
+    assert groq_service.active_model() == "openai/gpt-oss-120b"
+
+
+def test_error_when_no_model_is_available(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "groq_api_key", "fake-key")
+
+    class FakeCompletions:
+        def create(self, **kwargs):
+            raise model_not_found()
+
+    class FakeGroq:
+        def __init__(self, api_key):
+            self.chat = SimpleNamespace(completions=FakeCompletions())
+
+    monkeypatch.setattr(groq_service, "Groq", FakeGroq)
+
+    with pytest.raises(groq_service.GroqServiceError):
+        groq_service.generate_json(system_prompt="s", user_prompt="u")
