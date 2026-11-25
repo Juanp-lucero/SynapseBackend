@@ -9,7 +9,13 @@ if not settings.database_url:
         "DATABASE_URL no está configurada. Revisa SynapseIA/.env."
     )
 
-engine = create_engine(settings.database_url)
+# Serverless Postgres (Neon) closes idle connections; check each one before
+# use and recycle them so a stale socket never reaches a request.
+engine_options = {}
+if not settings.database_url.startswith("sqlite"):
+    engine_options = {"pool_pre_ping": True, "pool_recycle": 280}
+
+engine = create_engine(settings.database_url, **engine_options)
 
 SessionLocal = sessionmaker(
     autocommit=False,
