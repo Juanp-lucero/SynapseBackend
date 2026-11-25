@@ -4,6 +4,7 @@ from app.services.entity_extractor import extract_entities
 from app.services.relation_extractor import extract_relations
 from app.services.pattern_detector import detect_patterns
 from app.services.hypothesis_generator import generate_hypotheses
+from app.services.ai_extractor import extract_with_ai, merge_extraction
 
 
 def analyze_document(file_path: str) -> dict:
@@ -12,7 +13,20 @@ def analyze_document(file_path: str) -> dict:
     return analyze_text(text)
 
 
-def analyze_text(text: str) -> dict:
+def analyze_text(text: str, use_ai: bool = True) -> dict:
+    """Analyze plain text with rules and, when configured, with AI.
+
+    The deterministic pipeline always runs. When the Groq API key is
+    configured, the language model adds named entities, relations and
+    evidence-based hypotheses that are validated against the text.
+    """
+    result = analyze_text_with_rules(text)
+    if not use_ai:
+        return result
+    return merge_extraction(result, extract_with_ai(text))
+
+
+def analyze_text_with_rules(text: str) -> dict:
     """Run the existing deterministic extraction pipeline on plain text."""
     processed_text = process_text(text)
     normalized_text = processed_text["normalized_text"]
