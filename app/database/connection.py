@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 
 if not settings.database_url:
     raise RuntimeError(
-        "DATABASE_URL no está configurada. Revisa SynapseIA/.env."
+        "DATABASE_URL no está configurada. Revisa el archivo .env en la raíz del proyecto."
     )
 
 # Serverless Postgres (Neon) closes idle connections; check each one before
