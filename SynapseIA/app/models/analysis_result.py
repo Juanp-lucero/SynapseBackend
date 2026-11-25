@@ -1,9 +1,13 @@
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy import JSON, Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime, timezone
 
 from app.database.connection import Base
+
+
+# JSONB on PostgreSQL (production) and plain JSON elsewhere (SQLite tests).
+JSONType = JSON().with_variant(JSONB(), "postgresql")
 
 
 class AnalysisResult(Base):
@@ -29,25 +33,25 @@ class AnalysisResult(Base):
     )
 
     entities = Column(
-        JSONB,
+        JSONType,
         nullable=False,
         default=list
     )
 
     relations = Column(
-        JSONB,
+        JSONType,
         nullable=False,
         default=list
     )
 
     patterns = Column(
-        JSONB,
+        JSONType,
         nullable=False,
         default=list
     )
 
     hypotheses = Column(
-        JSONB,
+        JSONType,
         nullable=False,
         default=list
     )
