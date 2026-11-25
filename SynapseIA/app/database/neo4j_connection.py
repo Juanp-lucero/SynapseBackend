@@ -16,6 +16,10 @@ if settings.neo4j_uri and settings.neo4j_username and settings.neo4j_password:
     )
 
 
+def is_neo4j_configured() -> bool:
+    return driver is not None
+
+
 def get_neo4j_driver():
     if driver is None:
         raise RuntimeError(

@@ -3,10 +3,16 @@ from sqlalchemy.orm import Session
 
 from app.core.security import get_current_user
 from app.database.connection import get_db
-from app.database.neo4j_connection import get_neo4j_driver, NEO4J_DATABASE
+from app.database.neo4j_connection import (
+    get_neo4j_driver,
+    is_neo4j_configured,
+    NEO4J_DATABASE,
+)
+from app.models.analysis_result import AnalysisResult
 from app.models.user import User
 from app.models.project import Project
 from app.models.source import Source
+from app.services.graph_builder import build_graph_from_analyses
 
 
 router = APIRouter(
@@ -15,7 +21,7 @@ router = APIRouter(
 )
 
 
-def build_graph(source_ids: list[int]):
+def build_neo4j_graph(source_ids: list[int]):
     if not source_ids:
         return {
             "source_ids": [],
@@ -85,7 +91,38 @@ def build_graph(source_ids: list[int]):
         ) from exc
 
 
-@router.get("/")
+def build_postgres_graph(db: Session, sources: list[Source]) -> dict:
+    source_ids = [source.id for source in sources]
+    latest_analyses: dict[int, AnalysisResult] = {}
+
+    if source_ids:
+        analyses = (
+            db.query(AnalysisResult)
+            .filter(AnalysisResult.source_id.in_(source_ids))
+            .order_by(AnalysisResult.created_at.desc(), AnalysisResult.id.desc())
+            .all()
+        )
+        for analysis in analyses:
+            latest_analyses.setdefault(analysis.source_id, analysis)
+
+    return build_graph_from_analyses(sources, latest_analyses)
+
+
+def build_graph(db: Session, sources: list[Source]) -> dict:
+    """Use Neo4j when it is configured and reachable, otherwise PostgreSQL."""
+    if is_neo4j_configured():
+        try:
+            graph = build_neo4j_graph([source.id for source in sources])
+            if graph["nodes"]:
+                return graph
+        except HTTPException:
+            pass
+
+    return build_postgres_graph(db, sources)
+
+
+@router.get("")
+@router.get("/", include_in_schema=False)
 def get_general_graph(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -96,7 +133,7 @@ def get_general_graph(
         .filter(Project.user_id == current_user.id)
         .all()
     )
-    return build_graph([source.id for source in sources])
+    return build_graph(db, sources)
 
 
 @router.get("/project/{project_id}")
@@ -125,7 +162,7 @@ def get_project_graph(
         .filter(Source.project_id == project_id)
         .all()
     )
-    return build_graph([source.id for source in sources])
+    return build_graph(db, sources)
 
 
 @router.get("/source/{source_id}")
@@ -150,4 +187,4 @@ def get_source_graph(
             detail="Fuente no encontrada"
         )
 
-    return build_graph([source_id])
+    return build_graph(db, [source])
