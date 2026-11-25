@@ -8,7 +8,7 @@ from app.models.user import User
 from app.models.analysis_result import AnalysisResult
 from app.schemas.analysis import AnalysisResponse, AnalysisWithSummaryResponse
 from app.core.security import get_current_user
-from app.services.analysis_service import analyze_document
+from app.services.analysis_service import analyze_document, analyze_text
 from app.services.graph_service import save_analysis_to_graph
 from app.services.groq_service import (
     GroqNotConfiguredError,
@@ -46,14 +46,20 @@ def analyze_source(
             detail="Fuente no encontrada"
         )
 
-    if not source.file_path:
+    if not source.extracted_text and not source.file_path:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="La fuente no tiene un archivo asociado"
         )
 
     try:
-        result = analyze_document(source.file_path)
+        # The text is extracted and stored when the file is uploaded. Reading
+        # it from the database keeps the analysis working on serverless hosts,
+        # where uploaded files do not survive between requests.
+        if source.extracted_text and source.extracted_text.strip():
+            result = analyze_text(source.extracted_text)
+        else:
+            result = analyze_document(source.file_path)
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
