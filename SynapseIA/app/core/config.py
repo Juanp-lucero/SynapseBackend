@@ -22,7 +22,7 @@ class Settings:
         self.neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")
         self.groq_api_key = os.getenv("GROQ_API_KEY", "").strip()
         self.groq_model = os.getenv(
-            "GROQ_MODEL", "llama-3.3-70b-versatile"
+            "GROQ_MODEL", "openai/gpt-oss-120b"
         ).strip()
         self.cors_origins = [
             origin.strip().rstrip("/")

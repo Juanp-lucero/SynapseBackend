@@ -33,7 +33,7 @@ Copia `.env.example` como `.env` y configura PostgreSQL, Neo4j y Groq. No subas 
 - `SECRET_KEY`: clave aleatoria y privada para JWT.
 - `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD`, `NEO4J_DATABASE`: conexión al grafo.
 - `GROQ_API_KEY`: clave privada de Groq.
-- `GROQ_MODEL`: modelo de lenguaje. Valor por defecto: `llama-3.3-70b-versatile`.
+- `GROQ_MODEL`: modelo de lenguaje. Valor por defecto: `openai/gpt-oss-120b`.
 
 Obtén una clave desde https://console.groq.com/keys.
 
