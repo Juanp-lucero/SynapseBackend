@@ -59,6 +59,52 @@ def _generate(messages: list[dict[str, str]], max_tokens: int = 1400) -> str:
         ) from exc
 
 
+def is_ai_configured() -> bool:
+    return bool(settings.groq_api_key)
+
+
+def generate_json(
+    *,
+    system_prompt: str,
+    user_prompt: str,
+    max_tokens: int = 1800,
+) -> dict[str, Any]:
+    """Ask the model for a JSON object and return it parsed.
+
+    Raises ``GroqNotConfiguredError`` without an API key and
+    ``GroqServiceError`` when the provider fails or returns invalid JSON.
+    """
+    if not settings.groq_api_key:
+        raise GroqNotConfiguredError(
+            "La IA no está configurada. Define GROQ_API_KEY en el entorno."
+        )
+
+    try:
+        client = Groq(api_key=settings.groq_api_key)
+        response = client.chat.completions.create(
+            model=settings.groq_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=0,
+            max_tokens=max_tokens,
+            response_format={"type": "json_object"},
+            timeout=30,
+        )
+        content = response.choices[0].message.content or ""
+        data = json.loads(content)
+    except Exception as exc:
+        logger.exception("Groq JSON request failed")
+        raise GroqServiceError(
+            "No fue posible obtener una respuesta estructurada de la IA."
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise GroqServiceError("La IA no devolvió un objeto JSON.")
+    return data
+
+
 def _build_evidence(
     source_name: str,
     entities: list[dict[str, Any]],
