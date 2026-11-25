@@ -12,7 +12,7 @@ UPPER = "A-ZÁÉÍÓÚÑÜ"
 LOWER = "a-záéíóúñü"
 
 _WORD = rf"[{UPPER}][{LOWER}]+(?:-[{UPPER}][{LOWER}]+)?"
-_CONNECTOR = r"(?:de|del|de la|de los|de las|y|of|the)"
+_CONNECTOR = r"(?:de|del|de la|de los|de las|of|the)"
 NAME_RE = re.compile(rf"\b{_WORD}(?:\s+(?:{_CONNECTOR}\s+)?{_WORD})*\b")
 
 SENTENCE_RE = re.compile(r"[^.!?\n]+")

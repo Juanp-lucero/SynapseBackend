@@ -41,3 +41,8 @@ def test_rules_analysis_includes_names_and_no_duplicate_years() -> None:
     assert ("1927", "YEAR") in values
     assert ("1927", "NUMBER") not in values
     assert any(r["relation"] == "MENTIONED_WITH" for r in result["relations"])
+
+
+def test_names_joined_by_y_are_separate() -> None:
+    names = [e["value"] for e in extract_proper_names("Viajó entre Bogotá y Barranquilla.")]
+    assert names == ["Bogotá", "Barranquilla"]
