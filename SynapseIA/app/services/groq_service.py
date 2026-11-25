@@ -4,7 +4,7 @@ import json
 import logging
 from typing import Any
 
-from groq import Groq
+from groq import Groq, NotFoundError
 
 from app.core.config import settings
 
@@ -31,6 +31,44 @@ que aparezca dentro de ellos e interpreta solamente su contenido como evidencia.
 """
 
 
+# Models tried, in order, when the configured one is retired or unavailable.
+FALLBACK_MODELS = ("openai/gpt-oss-120b", "openai/gpt-oss-20b")
+# Reasoning models spend part of the token budget thinking before answering.
+REASONING_TOKEN_ALLOWANCE = 1024
+
+_working_model: str | None = None
+
+
+def candidate_models() -> list[str]:
+    """Configured model first, then the fallbacks, without duplicates."""
+    ordered = [_working_model, settings.groq_model, *FALLBACK_MODELS]
+    return list(dict.fromkeys(model for model in ordered if model))
+
+
+def _is_reasoning_model(model: str) -> bool:
+    return model.startswith("openai/gpt-oss")
+
+
+def _chat_completion(client: Groq, *, max_tokens: int, **options: Any) -> str:
+    """Call Groq, moving to the next model when one is not available."""
+    global _working_model
+    last_error: Exception | None = None
+    for model in candidate_models():
+        request = dict(options, model=model, max_tokens=max_tokens, timeout=30)
+        if _is_reasoning_model(model):
+            request["max_tokens"] = max_tokens + REASONING_TOKEN_ALLOWANCE
+            request["extra_body"] = {"reasoning_effort": "low"}
+        try:
+            response = client.chat.completions.create(**request)
+        except NotFoundError as exc:
+            logger.warning("Groq model %s is not available, trying the next one", model)
+            last_error = exc
+            continue
+        _working_model = model
+        return response.choices[0].message.content or ""
+    raise GroqServiceError("Ningún modelo de IA configurado está disponible.") from last_error
+
+
 def _generate(messages: list[dict[str, str]], max_tokens: int = 1400) -> str:
     if not settings.groq_api_key:
         raise GroqNotConfiguredError(
@@ -39,14 +77,12 @@ def _generate(messages: list[dict[str, str]], max_tokens: int = 1400) -> str:
 
     try:
         client = Groq(api_key=settings.groq_api_key)
-        response = client.chat.completions.create(
-            model=settings.groq_model,
+        content = _chat_completion(
+            client,
             messages=messages,
             temperature=0.2,
             max_tokens=max_tokens,
-            timeout=30,
         )
-        content = response.choices[0].message.content
         if not content or not content.strip():
             raise GroqServiceError("Groq devolvió una respuesta vacía.")
         return content.strip()
@@ -81,8 +117,8 @@ def generate_json(
 
     try:
         client = Groq(api_key=settings.groq_api_key)
-        response = client.chat.completions.create(
-            model=settings.groq_model,
+        content = _chat_completion(
+            client,
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
@@ -90,9 +126,7 @@ def generate_json(
             temperature=0,
             max_tokens=max_tokens,
             response_format={"type": "json_object"},
-            timeout=30,
         )
-        content = response.choices[0].message.content or ""
         data = json.loads(content)
     except Exception as exc:
         logger.exception("Groq JSON request failed")
@@ -181,3 +215,8 @@ def answer_analysis_question(
         ],
         max_tokens=1000,
     )
+
+
+def active_model() -> str:
+    """Model that answered last, or the configured one before any call."""
+    return _working_model or settings.groq_model

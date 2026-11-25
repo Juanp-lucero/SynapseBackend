@@ -14,6 +14,7 @@ from app.models.user import User
 from app.services.groq_service import (
     GroqNotConfiguredError,
     GroqServiceError,
+    active_model,
     generate_analysis_summary,
     answer_analysis_question,
 )
@@ -47,7 +48,7 @@ def ai_status(
     return {
         "provider": "groq",
         "configured": bool(settings.groq_api_key),
-        "model": settings.groq_model,
+        "model": active_model(),
     }
 
 
@@ -101,7 +102,7 @@ def summarize_source(
     return AnalysisSummaryResponse(
         source_id=source.id,
         provider="groq",
-        model=settings.groq_model,
+        model=active_model(),
         summary=summary,
     )
 
@@ -158,6 +159,6 @@ def ask_about_source(
     return AnalysisQuestionResponse(
         source_id=source.id,
         provider="groq",
-        model=settings.groq_model,
+        model=active_model(),
         answer=answer,
     )
