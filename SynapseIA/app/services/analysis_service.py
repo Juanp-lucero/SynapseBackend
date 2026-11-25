@@ -5,6 +5,7 @@ from app.services.relation_extractor import extract_relations
 from app.services.pattern_detector import detect_patterns
 from app.services.hypothesis_generator import generate_hypotheses
 from app.services.ai_extractor import extract_with_ai, merge_extraction
+from app.services.name_extractor import extract_name_relations, extract_proper_names
 
 
 def analyze_document(file_path: str) -> dict:
@@ -32,7 +33,10 @@ def analyze_text_with_rules(text: str) -> dict:
     normalized_text = processed_text["normalized_text"]
 
     entities = extract_entities(normalized_text)
+    names = extract_proper_names(normalized_text)
+    entities.extend(names)
     relations = extract_relations(entities)
+    relations.extend(extract_name_relations(normalized_text, names))
     patterns = detect_patterns(normalized_text)
     hypotheses = generate_hypotheses(entities, relations, patterns)
 
