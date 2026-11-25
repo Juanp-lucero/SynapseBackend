@@ -68,6 +68,10 @@ def extract_years(text: str) -> list[str]:
     )
 
 
+# Loose numbers flood the graph; keep only the first ones mentioned.
+MAX_NUMBERS = 25
+
+
 def extract_numbers(text: str) -> list[str]:
 
     numbers = re.findall(
@@ -75,9 +79,15 @@ def extract_numbers(text: str) -> list[str]:
         text
     )
 
-    return list(
-        dict.fromkeys(numbers)
-    )
+    years = set(extract_years(text))
+
+    unique = [
+        number
+        for number in dict.fromkeys(numbers)
+        if number not in years
+    ]
+
+    return unique[:MAX_NUMBERS]
 
 
 def extract_categories(text: str) -> list[str]:
