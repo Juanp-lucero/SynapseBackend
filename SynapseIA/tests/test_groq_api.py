@@ -15,9 +15,9 @@ from app.models.user import User
 
 TEST_USER = User(
     id=101,
-    username="synapse-ai-test",
+    name="Synapse AI Test",
     email="synapse-ai-test@example.com",
-    hashed_password="not-used",
+    password="not-used",
 )
 
 
