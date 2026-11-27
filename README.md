@@ -13,6 +13,15 @@ Desplegado en Vercel:
 | Estado de la API | https://synapse-backend-eight.vercel.app/health | |
 | Documentación de la API | https://synapse-backend-eight.vercel.app/docs | |
 
+## Cambios recientes
+
+Durante el despliegue en producción se hicieron los siguientes cambios pertinentes, por la vigencia de los servicios externos (APIs) y la configuración del servidor:
+
+- **Conexión a la base de datos:** Neon (PostgreSQL) cierra las conexiones inactivas, y las peticiones que consultan la base, como el inicio de sesión o el dashboard, podían fallar con error 500. Se agregó la verificación y renovación de conexiones (`pool_pre_ping`).
+- **Grafo de conocimiento:** no se generaba porque dependía de Neo4j, que no estaba disponible en producción, y de archivos que Vercel borra después de cada petición. Ahora el grafo se arma desde PostgreSQL.
+- **IA y API keys:** Groq retiró el modelo `llama-3.3-70b-versatile` en agosto de 2026 y la IA dejó de responder. Se cambió a `openai/gpt-oss-120b`, con un modelo de respaldo automático. Las llaves se configuraron como variables de entorno en Vercel y no quedan en el código.
+- **Estructura del repositorio:** el código se movió a la raíz para seguir buenas prácticas y se ajustó el despliegue.
+
 ## Cuenta de prueba
 
 Para revisar Synapse IA sin registrarse:
